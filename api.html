@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF RAG System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Upload PDF and Ask Questions</h2>
+        <form id="uploadForm">
+            <label for="pdfFile">Select PDF:</label>
+            <input type="file" id="pdfFile" accept="application/pdf" required>
+
+            <label for="query">Enter Your Question:</label>
+            <input type="text" id="query" placeholder="Ask a question..." required>
+
+            <button type="submit">Submit</button>
+        </form>
+
+        <div id="responseContainer">
+            <h3>Response:</h3>
+            <p id="responseText">Awaiting response...</p>
+        </div>
+    </div>
+
+    <script >
+        document.getElementById("uploadForm").addEventListener("submit", async function(event) {
+    event.preventDefault();
+
+    let fileInput = document.getElementById("pdfFile");
+    let queryInput = document.getElementById("query");
+    let responseText = document.getElementById("responseText");
+
+    if (fileInput.files.length === 0) {
+        alert("Please select a PDF file.");
+        return;
+    }
+
+    let formData = new FormData();
+    formData.append("pdf", fileInput.files[0]);
+    formData.append("query", queryInput.value);
+
+    responseText.textContent = "Processing request...";
+
+    try {
+        let response = await fetch("http://127.0.0.1:8080/process_pdf/", {
+            method: "POST",
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error("Error processing the request.");
+        }
+
+        let data = await response.json();
+        responseText.textContent = data.response;
+    } catch (error) {
+        responseText.textContent = "Error: " + error.message;
+    }
+});
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Market Report Analyzer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px auto;
+            padding: 20px;
+            max-width: 600px;
+            text-align: center;
+            background-color: #f4f4f9;
+        }
+        h2 { color: #4C72B0; }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #response, #comparison, #wordcloudContainer {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #ffffff;
+            text-align: left;
+        }
+        #wordcloudContainer img {
+            max-width: 100%;
+            height: auto;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>RAG Market Report Analyzer</h2>
+
+    <!-- File Upload Section -->
+    <input type="file" id="pdfUpload" multiple>
+    <button onclick="uploadFiles()">Upload PDFs</button>
+    <p id="uploadStatus"></p>
+
+    <!-- Query Section -->
+    <input type="text" id="queryInput" placeholder="Enter your search query">
+    <button onclick="searchReports()">Search</button>
+    <button onclick="compareReports()">Compare Reports</button>
+    <button onclick="generateWordCloud()">Show Reports Word Cloud</button>
+
+    <!-- Display Responses -->
+    <div id="response"></div>
+    <div id="comparison"></div>
+
+    <!-- Word Cloud Display -->
+    <div id="wordcloudContainer">
+        <h3>Word Cloud Visualization</h3>
+        <img id="wordcloudImage" src="" alt="Word Cloud will appear here">
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8080";
+
+        async function uploadFiles() {
+            const files = document.getElementById('pdfUpload').files;
+            if (files.length === 0) {
+                alert("Please select at least one PDF file.");
+                return;
+            }
+
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append("files", file);
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/upload_reports/`, {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const result = await response.json();
+                document.getElementById('uploadStatus').innerText = result.message;
+            } catch (error) {
+                console.error("Error uploading files:", error);
+            }
+            try {
+                const response = await fetch(`${API_URL}/check_plagiarism/`, {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const result = await response.json();
+                document.getElementById('uploadStatus').innerText = "Your similarity percent is " + result.interpretation + " & Your Semantic Similarity is " + result.similarity * 100;
+                console.log(result)
+            } catch (error) {
+                console.error("Error uploading files:", error);
+            }
+        }
+
+        async function searchReports() {
+            const query = document.getElementById('queryInput').value;
+            if (!query) {
+                alert("Please enter a search query.");
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/query/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: query }),
+                });
+
+                const result = await response.json();
+                document.getElementById('response').innerHTML = `<h3>Results:</h3><p>${result.response}</p>`;
+            } catch (error) {
+                console.error("Error searching reports:", error);
+            }
+        }
+        async function generateWordCloud() {
+    try {
+        const response = await fetch(`${API_URL}/generate_dynamic_wordcloud/`, {
+            method: "GET"
+        });
+
+        if (!response.ok) {
+            alert("Error generating word cloud.");
+            return;
+        }
+
+        // Convert response to Blob and create a URL for the image
+        const blob = await response.blob();
+        const imgUrl = URL.createObjectURL(blob);
+
+        // Set the image source
+        document.getElementById('wordcloudImage').src = imgUrl;
+    } catch (error) {
+        console.error("Error generating word cloud:", error);
+    }
+}
+
+// async function generateWordCloud() {
+//     try {
+//         const response = await fetch(`${API_URL}/generate_dynamic_wordcloud/`, {
+//             method: "GET",
+//              });
+//
+//         if (!response.ok) {
+//             alert("Error generating word cloud.");
+//             return;
+//         }
+//
+//         // Convert response to Blob and create a URL for the image
+//         const blob = await response.blob();
+//         const imgUrl = URL.createObjectURL(blob);
+//
+//         // Set the image source
+//         document.getElementById('wordcloudImage').src = imgUrl;
+//     } catch (error) {
+//         console.error("Error generating word cloud:", error);
+//     }
+// }
+
+
+    </script>
+
+</body>
+</html>
