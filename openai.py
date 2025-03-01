@@ -644,8 +644,8 @@ index = faiss.IndexFlatL2(embedding_dim)
 documents = []  # Store document text and metadata
 
 # Load Transformer Pipelines
-text_generator = pipeline("text-generation", model="AI-Sweden-Models/gpt-sw3-356m")
-summarizer = pipeline("summarization", model="google/flan-t5-base")
+text_generator = pipeline("text-generation", model="t5-base")
+summarizer = pipeline("summarization", model="t5-base")
 
 # Load Chatbot Model (e.g., Mistral-7B or LLaMA-2-7B)
 chatbot_model = AutoModelForCausalLM.from_pretrained("google/gemma-2bkk")
