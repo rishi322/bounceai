@@ -24,7 +24,7 @@ import os
 from transformers import pipeline, AutoTokenizer
 from typing import List, Dict
 # Load Language Model for RAG (Example: OpenAI GPT or Mistral-7B)
-rag_model = pipeline("text-generation", model="t5-base")  # Replace with better RAG model
+rag_model = pipeline("text-generation", model="t5-base",device = 0 if torch.cuda.is_available() else -1)  # Replace with better RAG model
 
 # Global variable to store extracted text
 text2 = []
@@ -54,7 +54,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-llm_pipeline = pipeline("text-generation", model="t5-base", device=0)  # Use GPU if available
+llm_pipeline = pipeline("text-generation", model="t5-base", device = 0 if torch.cuda.is_available() else -1)  # Use GPU if available
 
 # FAISS Vector Store
 embedding_dim = 384  # all-MiniLM-L6-v2 produces 384-dimensional vectors
