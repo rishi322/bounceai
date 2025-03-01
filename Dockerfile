@@ -16,5 +16,8 @@ COPY . .
 # Expose the port the app runs on
 EXPOSE 8000
 
+
+# Run FastAPI application
+CMD ["python", "openai.py"]
 # Command to run the application
-CMD ["uvicorn", "openai:app", "--host", "0.0.0.0", "--port", "8000"]
+# CMD ["uvicorn", "openai:app", "--host", "0.0.0.0", "--port", "8000"]
