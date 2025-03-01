@@ -1,3 +1,4 @@
+from collections import deque
 from typing import List
 import os
 import faiss
@@ -12,7 +13,7 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer, util
 from sklearn.feature_extraction.text import TfidfVectorizer
 from torch import cosine_similarity
-from transformers import pipeline
+from transformers import pipeline, AutoModelForSeq2SeqLM, AutoModelForCausalLM
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import matplotlib.pyplot as plt
@@ -636,6 +637,84 @@ async def compare_reports(request: QueryRequest):
         "sources": list(report_sections.keys())
     }
 
+
+
+# Load Sentence Transformer Model for Embeddings
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+# FAISS Vector Store
+embedding_dim = 384  # all-MiniLM-L6-v2 produces 384-dimensional vectors
+index = faiss.IndexFlatL2(embedding_dim)
+documents = []  # Store document text and metadata
+
+# Load Transformer Pipelines
+text_generator = pipeline("text-generation", model="AI-Sweden-Models/gpt-sw3-356m")
+summarizer = pipeline("summarization", model="google/flan-t5-base")
+
+# Load Chatbot Model (e.g., Mistral-7B or LLaMA-2-7B)
+chatbot_model = AutoModelForCausalLM.from_pretrained("google/gemma-2bkk")
+tok = AutoTokenizer.from_pretrained("google/gemma-2b")
+# Conversation Memory (Stores last 5 exchanges per user)
+conversation_history = {}
+
+class QueryRequest(BaseModel):
+    query: str
+    user_id: str  # Unique user ID for tracking conversation history
+
+@app.post("/rag_chat/")
+async def rag_chat(request: QueryRequest):
+    """Perform Retrieval-Augmented Generation (RAG) chat and summarization."""
+
+    # Retrieve relevant sections
+    query_embedding = generate_embeddings(request.query).reshape(1, -1)
+    D, I = index.search(query_embedding, k=5)
+    relevant_sections = [documents[i]["text"] for i in I[0] if 0 <= i < len(documents)]
+    context_text = "\n\n".join(relevant_sections)
+
+    if not context_text:
+        return {"query": request.query, "response": "No relevant documents found."}
+
+    # Generate AI response using text generation
+    prompt = f"Given the following document context, answer: {request.query}\n\nContext:\n{context_text}"
+    ai_response = text_generator(prompt, max_length=500, num_return_sequences=1)[0]['generated_text']
+
+    # Summarize the generated response
+    summary = summarizer(ai_response, max_length=150, min_length=50, do_sample=False)[0]['summary_text']
+
+    return {
+        "query": request.query,
+        "response": summary,  # Returning the summarized response
+        "sources": [documents[i]["source"] for i in I[0] if 0 <= i < len(documents)]
+    }
+
+@app.post("/chatbot/")
+async def chatbot(request: QueryRequest):
+    """Chat with the AI model, maintaining conversation history."""
+    inputs = tok(request.query, return_tensors="pt")
+    outputs = chatbot_model.generate(**inputs)
+    print(outputs)
+    print(tok.batch_decode(outputs, skip_special_tokens=True))
+    ['Pour a cup of bolognese into a large bowl and add the pasta']
+    # # Retrieve conversation history for the user
+    # user_id = request.user_id
+    # if user_id not in conversation_history:
+    #     conversation_history[user_id] = deque(maxlen=5)  # Store last 5 exchanges
+    #
+    # # Prepare chat history
+    # chat_history = "\n".join(conversation_history[user_id])
+    # chat_prompt = f"{chat_history}\nUser: {request.query}\nAI:"
+    #
+    # # Generate AI chatbot response
+    # ai_response = chatbot_model(chat_prompt, max_length=200, num_return_sequences=1)[0]['generated_text']
+    #
+    # # Store conversation history
+    # conversation_history[user_id].append(f"User: {request.query}")
+    # conversation_history[user_id].append(f"AI: {ai_response}")
+
+    return {
+        "query": request.query,
+        "response": tok.batch_decode(outputs, skip_special_tokens=True)
+    }
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
