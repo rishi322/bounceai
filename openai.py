@@ -626,14 +626,10 @@ async def compare_reports(request: QueryRequest):
                 report_sections[source] = []
             report_sections[source].append(text)
 
-    # Format comparative analysis
-    comparison_text = "\n\n".join(
-        [f"**{source}**:\n{'\n'.join(sections)}" for source, sections in report_sections.items()]
-    )
+    
 
     return {
         "query": request.query,
-        "comparison": comparison_text,
         "sources": list(report_sections.keys())
     }
 
