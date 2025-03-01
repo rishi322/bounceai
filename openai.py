@@ -712,5 +712,5 @@ async def chatbot(request: QueryRequest):
         "response": tok.batch_decode(outputs, skip_special_tokens=True)
     }
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    port = int(os.environ.get("PORT", 8080))  # Use Google's provided PORT or fallback to 8080
+    uvicorn.run(app, host="0.0.0.0", port=port)
