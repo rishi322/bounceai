@@ -1,23 +1,19 @@
-# Use an official Python runtime as a parent image
+# Use official Python image
 FROM python:3.10-slim
 
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt .
-
-# Install the dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application code
+# Copy all files to the container
 COPY . .
 
-# Expose the port the app runs on
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Expose the correct port for Google Cloud Run
 EXPOSE 8000
 
+# Set environment variable for Cloud Run
+ENV PORT=8000
 
-# Run FastAPI application
-CMD ["python", "openai.py"]
-# Command to run the application
-# CMD ["uvicorn", "openai:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
