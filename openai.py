@@ -7,7 +7,7 @@ import numpy as np
 import textblob
 import re
 import torch
-from fastapi import FastAPI, UploadFile, File,HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer, util
@@ -26,14 +26,14 @@ from typing import List, Dict
 
 from huggingface_hub import login
 
-
 hf_token = os.getenv("HF_TOKEN")
 if not hf_token:
     raise ValueError("Hugging Face token not found in environment variables.")
 login(token=hf_token)
 
 # Load Language Model for RAG (Example: OpenAI GPT or Mistral-7B)
-rag_model = pipeline("text-generation", model="t5-base",device = 0 if torch.cuda.is_available() else -1)  # Replace with better RAG model
+rag_model = pipeline("text-generation", model="t5-base",
+                     device=0 if torch.cuda.is_available() else -1)  # Replace with better RAG model
 
 # Global variable to store extracted text
 text2 = []
@@ -43,15 +43,19 @@ OPENAI_API_KEY = "sk-proj-2pI_An8vN02qlioYuoiXX2PxB9wyzLLFlNTNPNEj2ozzryj_HUKKnG
 
 model_name = "t5-base"
 generator = pipeline("summarization", model=model_name)
-sentiments = pipeline("sentiment-analysis",model=model_name)
+sentiments = pipeline("sentiment-analysis", model=model_name)
 
 # Load tokenizer for proper truncation
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-nlp = pipeline("ner",model="dslim/bert-base-NER")
+nlp = pipeline("ner", model="dslim/bert-base-NER")
+
+
 class ReportRequest(BaseModel):
     report1: str
     report2: str
+
+
 # Initialize FastAPI
 app = FastAPI()
 
@@ -69,8 +73,11 @@ embedding_dim = 384  # all-MiniLM-L6-v2 produces 384-dimensional vectors
 index = faiss.IndexFlatL2(embedding_dim)
 documents = []  # Store document text and metadata
 
+
 class QueryRequest(BaseModel):
     query: str
+
+
 textfetch = []
 
 
@@ -117,6 +124,8 @@ def ai_prompt_analysis():
     }
 
     return final_response
+
+
 # PDF Processing Function
 
 def extract_text_from_pdf(pdf_file: UploadFile):
@@ -127,13 +136,13 @@ def extract_text_from_pdf(pdf_file: UploadFile):
     doc = fitz.open(stream=pdf_data, filetype="pdf")
     text_sections = [page.get_text("text") for page in doc]
 
-
     text2 = "\n".join(text_sections)
 
     return text_sections
 
 
 summarizer = generator
+
 
 class ReportRequest(BaseModel):
     textfetch: list
@@ -173,13 +182,18 @@ def analyze_reports():
     }
 
     return final_response
+
+
 # Generate Embeddings
 def generate_embeddings(text: str):
     """Generate embeddings using Sentence Transformers."""
     return embedding_model.encode(text, convert_to_numpy=True)
+
+
 class MarketReport(BaseModel):
     text1: str
     text2: str
+
 
 def extract_entities(text):
     """Extracts named entities from text using spaCy."""
@@ -199,11 +213,13 @@ def extract_financial_numbers(text):
     """Extracts financial figures and key performance indicators (KPIs)."""
     financial_data = {
         "Revenue": re.findall(r"(\$\d+[\d,\.]*)\s*(million|billion|trillion)?\s*revenue", text, re.IGNORECASE),
-        "Profit/Loss": re.findall(r"(\$\d+[\d,\.]*)\s*(million|billion|trillion)?\s*(profit|loss)", text, re.IGNORECASE),
+        "Profit/Loss": re.findall(r"(\$\d+[\d,\.]*)\s*(million|billion|trillion)?\s*(profit|loss)", text,
+                                  re.IGNORECASE),
         "Market Share": re.findall(r"(\d+\.?\d*)%\s*market share", text, re.IGNORECASE),
         "Stock Price": re.findall(r"\$\d+[\d,\.]*\s*(?:per share|stock price)", text, re.IGNORECASE)
     }
     return financial_data
+
 
 @app.get("/reportgen/")
 def compare_market_reports():
@@ -247,15 +263,24 @@ def compare_market_reports():
 
     return comparison_result
 
+
 @app.get("/")
 def home():
     return {"message": "Welcome to the RAG Market Report API"}
+
+
 text = []
+
+
 @app.post("/upload_reports/")
-async def upload_reports(files: List[UploadFile] = File(...)):
+async def upload_reports(files: List[UploadFile] = File(...,  max_size=100_000_000)):
     """Process and store PDF embeddings."""
+    for file in files:
+        if file.size > 100_000_000:  # 50 MB
+            raise HTTPException(status_code=413, detail="File size exceeds the 50 MB limit.")
+       
     global documents, index
-    global text2,textfetch
+    global text2, textfetch
     text2 = ''  # Reset previous data
     textfetch = []
     for file in files:
@@ -267,23 +292,24 @@ async def upload_reports(files: List[UploadFile] = File(...)):
         textfetch.append({"text": " ".join(sections), "source": file.filename})
         print(textfetch)
 
-
     for section in sections:
-            documents.append({"text": section, "source": file.filename})
+        documents.append({"text": section, "source": file.filename})
 
-            # Generate embeddings
-            embeddings = generate_embeddings(section)
+        # Generate embeddings
+        embeddings = generate_embeddings(section)
 
-            # Reshape for FAISS
-            embeddings = embeddings.reshape(1, -1)
-            index.add(embeddings)
-
-
+        # Reshape for FAISS
+        embeddings = embeddings.reshape(1, -1)
+        index.add(embeddings)
 
     return {"message": "Reports uploaded and processed successfully."}
+
+
 @app.get('/hi/')
 def hi():
     return text[1]
+
+
 def compare_reports_hf(reports: List[Dict[str, str]]):
     """Compares multiple reports using a Hugging Face summarization model."""
     try:
@@ -304,7 +330,6 @@ def compare_reports_hf(reports: List[Dict[str, str]]):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Hugging Face API error: {str(e)}")
-
 
 
 # def compare_reports_hf(reports: List[Dict[str, str]]):
@@ -349,6 +374,7 @@ def summarize_text(text, max_tokens=1024):
 
     summary = generator(truncated_text, max_new_tokens=150, min_length=0, do_sample=False)[0]["summary_text"]
     return summary
+
 
 def analyze_sentiment(text):
     """Extracts sentiment polarity from a market report."""
@@ -414,6 +440,7 @@ def compare_market_reports():
     except Exception as e:
         return {"error": f"Error in market report comparison: {str(e)}"}
 
+
 def generate_word_cloud(text: str):
     """Generate a word cloud from the given text and return an image stream."""
     if not text.strip():
@@ -473,6 +500,7 @@ async def generate_wordcloud(request: ReportRequest):
 
     return StreamingResponse(img_stream, media_type="image/png")
 
+
 def compute_similarity(text1, text2):
     """Compute TF-IDF Cosine Similarity using PyTorch Tensors."""
     vectorizer = TfidfVectorizer()
@@ -509,11 +537,13 @@ def compute_semantic_similarity(text1, text2):
     """Compute similarity between two texts using NLP embeddings."""
     model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    embeddings =  embedding_model.encode(text1, convert_to_numpy=True).reshape(1, -1)
+    embeddings = embedding_model.encode(text1, convert_to_numpy=True).reshape(1, -1)
     embeddings2 = embedding_model.encode(text2, convert_to_numpy=True).reshape(1, -1)
     similarity = cosine_similarity(embeddings, embeddings2)[0][0]
 
     return float(similarity)
+
+
 @app.post("/similarity/")
 async def similarity(files: List[UploadFile] = File(...)):
     # Extract text from PDFs
@@ -522,15 +552,16 @@ async def similarity(files: List[UploadFile] = File(...)):
     similarity = compute_semantic_similarity(text1, text3)
     return {"similarity": round(float(similarity), 4)}
 
+
 @app.post("/check_plagiarism/")
-async def check_plagiarism(files: List[UploadFile] = File(...)):
+async def check_plagiarism(files: List[UploadFile] = File(..., max_size=100_000_00)):
     """Check plagiarism similarity between two uploaded PDF reports."""
     try:
         # Extract text from PDFs
         text1 = extract_text_from_pdf2(files[0])
         text3 = extract_text_from_pdf2(files[1])
 
-        print(type(text3) )
+        print(type(text3))
         if not text1.strip() or not text3.strip():
             return {"error": "One or both files are empty."}
 
@@ -546,6 +577,7 @@ async def check_plagiarism(files: List[UploadFile] = File(...)):
     except Exception as e:
         print(e)
         return {"error": str(e)}
+
 
 def generate_word_cloud_from_text(text1):
     """Generate a word cloud from the given text and return an image stream."""
@@ -566,6 +598,7 @@ def generate_word_cloud_from_text(text1):
 
     return img_stream
 
+
 @app.get("/generate_dynamic_wordcloud/")
 async def generate_dynamic_wordcloud():
     """Generate a word cloud from the dynamically updated text2 variable."""
@@ -579,6 +612,7 @@ async def generate_dynamic_wordcloud():
     img_stream = generate_word_cloud_from_text(combined_text)
 
     return StreamingResponse(img_stream, media_type="image/png")
+
 
 @app.post("/query/")
 async def query_reports(request: QueryRequest):
@@ -613,6 +647,7 @@ async def query_reports(request: QueryRequest):
         "sources": [doc["source"] for doc in relevant_sections]
     }
 
+
 @app.post("/compare_reports/")
 async def compare_reports(request: QueryRequest):
     """Compare insights from multiple reports based on a query."""
@@ -633,13 +668,10 @@ async def compare_reports(request: QueryRequest):
                 report_sections[source] = []
             report_sections[source].append(text)
 
-    
-
     return {
         "query": request.query,
         "sources": list(report_sections.keys())
     }
-
 
 
 # Load Sentence Transformer Model for Embeddings
@@ -653,16 +685,17 @@ documents = []  # Store document text and metadata
 # Load Transformer Pipelines
 text_generator = rag_model
 
-
 # Load Chatbot Model (e.g., Mistral-7B or LLaMA-2-7B)
 chatbot_model = AutoModelForCausalLM.from_pretrained("google/gemma-2b")
 tok = AutoTokenizer.from_pretrained("google/gemma-2b")
 # Conversation Memory (Stores last 5 exchanges per user)
 conversation_history = {}
 
+
 class QueryRequest(BaseModel):
     query: str
     user_id: str  # Unique user ID for tracking conversation history
+
 
 @app.post("/rag_chat/")
 async def rag_chat(request: QueryRequest):
@@ -682,13 +715,14 @@ async def rag_chat(request: QueryRequest):
     ai_response = text_generator(prompt, max_length=500, num_return_sequences=1)[0]['generated_text']
 
     # Summarize the generated response
-    summary = summarizer(ai_response, max_length=150, min_length=50, do_sample=False)[0]['summary_text']
+    summary = generator(ai_response, max_length=150, min_length=50, do_sample=False)[0]['summary_text']
 
     return {
         "query": request.query,
         "response": summary,  # Returning the summarized response
         "sources": [documents[i]["source"] for i in I[0] if 0 <= i < len(documents)]
     }
+
 
 @app.post("/chatbot/")
 async def chatbot(request: QueryRequest):
@@ -719,3 +753,8 @@ async def chatbot(request: QueryRequest):
         "response": tok.batch_decode(outputs, skip_special_tokens=True)
     }
 
+
+# Run the app
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)
