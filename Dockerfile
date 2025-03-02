@@ -7,6 +7,8 @@ WORKDIR /app
 # Copy all files to the container
 COPY . .
 
+# Set the Hugging Face token as an environment variable
+ENV HF_TOKEN="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"
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -15,6 +17,5 @@ EXPOSE 8080
 
 # Set environment variable for Cloud Run
 ENV PORT=8080
-
-# Run FastAPI application
-CMD ["python", "openai.py"]
+# Command to run the application using Uvicorn
+CMD ["uvicorn", "openai:app", "--host", "0.0.0.0", "--port", "8080"]
