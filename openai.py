@@ -273,8 +273,12 @@ text = []
 
 
 @app.post("/upload_reports/")
-async def upload_reports(files: List[UploadFile] = File(...)):
+async def upload_reports(files: List[UploadFile] = File(...,  max_size=50_000_000)):
     """Process and store PDF embeddings."""
+    for file in files:
+        if file.size > 50_000_000:  # 50 MB
+            raise HTTPException(status_code=413, detail="File size exceeds the 50 MB limit.")
+       
     global documents, index
     global text2, textfetch
     text2 = ''  # Reset previous data
