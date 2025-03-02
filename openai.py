@@ -23,6 +23,15 @@ import os
 
 from transformers import pipeline, AutoTokenizer
 from typing import List, Dict
+
+from huggingface_hub import login
+
+
+hf_token = os.getenv("HF_TOKEN")
+if not hf_token:
+    raise ValueError("Hugging Face token not found in environment variables.")
+login(token=hf_token)
+
 # Load Language Model for RAG (Example: OpenAI GPT or Mistral-7B)
 rag_model = pipeline("text-generation", model="t5-base",device = 0 if torch.cuda.is_available() else -1)  # Replace with better RAG model
 
@@ -54,8 +63,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-llm_pipeline = pipeline("text-generation", model="t5-base", device = 0 if torch.cuda.is_available() else -1)  # Use GPU if available
-
+llm_pipeline = rag_model
 # FAISS Vector Store
 embedding_dim = 384  # all-MiniLM-L6-v2 produces 384-dimensional vectors
 index = faiss.IndexFlatL2(embedding_dim)
@@ -125,8 +133,7 @@ def extract_text_from_pdf(pdf_file: UploadFile):
     return text_sections
 
 
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn", device=0 if torch.cuda.is_available() else -1)
-
+summarizer = generator
 
 class ReportRequest(BaseModel):
     textfetch: list
@@ -644,11 +651,11 @@ index = faiss.IndexFlatL2(embedding_dim)
 documents = []  # Store document text and metadata
 
 # Load Transformer Pipelines
-text_generator = pipeline("text-generation", model="t5-base")
-summarizer = pipeline("summarization", model="t5-base")
+text_generator = rag_model
+
 
 # Load Chatbot Model (e.g., Mistral-7B or LLaMA-2-7B)
-chatbot_model = AutoModelForCausalLM.from_pretrained("google/gemma-2bkk")
+chatbot_model = AutoModelForCausalLM.from_pretrained("google/gemma-2b")
 tok = AutoTokenizer.from_pretrained("google/gemma-2b")
 # Conversation Memory (Stores last 5 exchanges per user)
 conversation_history = {}
@@ -711,6 +718,4 @@ async def chatbot(request: QueryRequest):
         "query": request.query,
         "response": tok.batch_decode(outputs, skip_special_tokens=True)
     }
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))  # Use Google's provided PORT or fallback to 8080
-    uvicorn.run(app, host="0.0.0.0", port=port)
+
