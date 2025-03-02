@@ -715,7 +715,7 @@ async def rag_chat(request: QueryRequest):
     ai_response = text_generator(prompt, max_length=500, num_return_sequences=1)[0]['generated_text']
 
     # Summarize the generated response
-    summary = summarizer(ai_response, max_length=150, min_length=50, do_sample=False)[0]['summary_text']
+    summary = generator(ai_response, max_length=150, min_length=50, do_sample=False)[0]['summary_text']
 
     return {
         "query": request.query,
