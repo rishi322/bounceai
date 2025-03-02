@@ -554,7 +554,7 @@ async def similarity(files: List[UploadFile] = File(...)):
 
 
 @app.post("/check_plagiarism/")
-async def check_plagiarism(files: List[UploadFile] = File(...)):
+async def check_plagiarism(files: List[UploadFile] = File(..., max_size=100_000_00)):
     """Check plagiarism similarity between two uploaded PDF reports."""
     try:
         # Extract text from PDFs
